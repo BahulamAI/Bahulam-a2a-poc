@@ -1,0 +1,4 @@
+Bahulam Two-Agent IDE POC
+
+This is a local development proof of concept. It is not a production-ready autonomous coding environment.
+A Python virtual environment is not a security sandbox. Never run generated or untrusted code on a machine containing credentials or sensitive data. Use a disposable VM/container with network and filesystem restrictions before any external demo.

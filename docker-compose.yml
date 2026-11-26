@@ -1,0 +1,84 @@
+services:
+  setup-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "bahulam_poc.agents.setup_server"]
+    env_file:
+      - .env
+    environment:
+      SETUP_AGENT_HOST: 0.0.0.0
+      SETUP_AGENT_PORT: 9101
+      SETUP_AGENT_URL: http://setup-agent:9101
+      WORKSPACE_ROOT: /app/workspaces
+      CONTROL_PLANE_DB: /app/state/control_plane.sqlite3
+    ports:
+      - "9101:9101"
+    volumes:
+      - ./workspaces:/app/workspaces
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9101/.well-known/agent-card.json', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  builder-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "bahulam_poc.agents.builder_server"]
+    depends_on:
+      setup-agent:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      BUILDER_AGENT_HOST: 0.0.0.0
+      BUILDER_AGENT_PORT: 9102
+      BUILDER_AGENT_URL: http://builder-agent:9102
+      SETUP_AGENT_URL: http://setup-agent:9101
+      WORKSPACE_ROOT: /app/workspaces
+      CONTROL_PLANE_DB: /app/state/control_plane.sqlite3
+    ports:
+      - "9102:9102"
+    volumes:
+      - ./workspaces:/app/workspaces
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9102/.well-known/agent-card.json', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["cli"]
+    depends_on:
+      builder-agent:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      SETUP_AGENT_URL: http://setup-agent:9101
+      BUILDER_AGENT_URL: http://builder-agent:9102
+      WORKSPACE_ROOT: /app/workspaces
+      CONTROL_PLANE_DB: /app/state/control_plane.sqlite3
+    volumes:
+      - ./workspaces:/app/workspaces
+      - ./state:/app/state
+    entrypoint: ["python", "-m", "bahulam_poc.cli"]
